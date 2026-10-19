@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mykola · Java CRUD</title>
+  <style>
+    body {font-family:system-ui,Arial,sans-serif;max-width:760px;margin:55px auto;padding:0 20px;color:#172033;background:#f5f7fb}
+    main {background:white;padding:30px;border-radius:14px;box-shadow:0 6px 25px #10204012}
+    h1 {margin-top:0} p {color:#576579} form {display:flex;gap:10px;margin:24px 0}
+    input {flex:1;min-width:0;padding:12px;border:1px solid #cdd5df;border-radius:8px;font-size:16px}
+    button {padding:10px 15px;border:0;border-radius:8px;background:#2267d9;color:white;cursor:pointer}
+    button.secondary {background:#e9eef7;color:#263249} button.danger {background:#d63c45}
+    li {display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #e9eef6}
+    li span {flex:1} ul {padding:0;list-style:none} .done {text-decoration:line-through;color:#798495}
+    #status {min-height:20px;color:#555}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Mykola · Task Manager</h1>
+  <p>Java Spring Boot CRUD: Create, Read, Update, Delete</p>
+  <form id="add-form"><input id="title" required placeholder="New task"><button>Add</button></form>
+  <ul id="tasks"></ul>
+  <p id="status">Ready</p>
+</main>
+<script>
+const api = '/api/tasks';
+const list = document.getElementById('tasks');
+const statusLine = document.getElementById('status');
+async function request(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.status === 204 ? null : response.json();
+}
+async function refresh() {
+  const tasks = await request(api);
+  list.replaceChildren();
+  if (!tasks.length) statusLine.textContent = 'No tasks yet — add one above';
+  else statusLine.textContent = `${tasks.length} task(s)`;
+  for (const task of tasks) {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = task.title;
+    if (task.done) name.className = 'done';
+    li.append(name);
+    const toggle = document.createElement('button');
+    toggle.textContent = task.done ? 'Undo' : 'Done';
+    toggle.className = 'secondary';
+    toggle.onclick = () => act(() => request(`${api}/${task.id}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title:task.title,done:!task.done})
+    }));
+    li.append(toggle);
+    const edit = document.createElement('button');
+    edit.textContent = 'Edit'; edit.className = 'secondary';
+    edit.onclick = () => {
+      const title = prompt('Edit task:', task.title);
+      if (title !== null && title.trim()) act(() => request(`${api}/${task.id}`, {
+        method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title,done:task.done})
+      }));
+    };
+    li.append(edit);
+    const remove = document.createElement('button');
+    remove.textContent = 'Delete'; remove.className = 'danger';
+    remove.onclick = () => act(() => request(`${api}/${task.id}`, {method:'DELETE'}));
+    li.append(remove); list.append(li);
+  }
+}
+async function act(task) {
+  try { await task(); await refresh(); }
+  catch (e) { statusLine.textContent = 'Error: ' + e.message; }
+}
+document.getElementById('add-form').onsubmit = event => {
+  event.preventDefault();
+  const field = document.getElementById('title');
+  const title = field.value.trim();
+  if (!title) return;
+  act(() => request(api, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,done:false})}));
+  field.value = '';
+};
+act(async () => {});
+</script>
+</body>
+</html>
